@@ -91,6 +91,19 @@ def compute_irr(dated_flows: List[CashFlow],
         full_output=True)
     return irr.item()
 
+def sum_flows(dated_flows: List[CashFlow],
+                pricer: Pricer,
+                target_currency: Currency) -> float:
+    """Compute the irregularly spaced IRR."""
+
+    # Array of cash flows, converted to USD.
+    usd_flows = []
+    for flow in dated_flows:
+        usd_amount = pricer.convert_amount(flow.amount, target_currency, date=flow.date)
+        usd_flows.append(float(usd_amount.number))
+    cash_flows = np.array(usd_flows)
+    return np.sum(cash_flows)
+
 
 Returns = typing.NamedTuple("Returns", [
     ('groupname', str),
@@ -100,6 +113,9 @@ Returns = typing.NamedTuple("Returns", [
     ("total", float),
     ("exdiv", float),
     ("div", float),
+    ("book_value", float),
+    ("market_value", float),
+    ("pnl", float),
     ("flows", List[CashFlow]),
 ])
 
@@ -110,7 +126,7 @@ def compute_returns(flows: List[CashFlow],
                     end_date: Date) -> Returns:
     """Compute the returns from a list of cash flows."""
     if not flows:
-        return Returns("?", Date.today(), Date.today(), 0, 0, 0, 0, [])
+        return Returns("?", Date.today(), Date.today(), 0, 0, 0, 0, 0, 0, 0, [])
 
     flows = sorted(flows, key=lambda cf: cf.date)
     irr = compute_irr(flows, pricer, target_currency, end_date)
@@ -118,11 +134,23 @@ def compute_returns(flows: List[CashFlow],
     flows_exdiv = [flow for flow in flows if not flow.is_dividend]
     irr_exdiv = compute_irr(flows_exdiv, pricer, target_currency, end_date)
 
+    flows_book = [flow for flow in flows if flow.source == 'cash']
+    book_value = - sum_flows(flows_book, pricer, target_currency)
+
+    flows_book = [flow for flow in flows if flow.source == 'close']
+    market_value = sum_flows(flows_book, pricer, target_currency)
+
+    if book_value > 0.01:
+        pnl = (market_value - book_value) / book_value
+    else:
+        pnl = 0
+
     first_date = flows[0].date
     last_date = flows[-1].date
     years = (last_date - first_date).days / 365
     return Returns("?", first_date, last_date, years,
                    irr, irr_exdiv, (irr - irr_exdiv),
+                   book_value, market_value, pnl,
                    flows)
 
 

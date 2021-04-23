@@ -200,6 +200,12 @@ def write_returns_html(dirname: str,
         fprint(render_table(Table(["Total", "Ex-Div", "Div"],
                                   [[returns.total, returns.exdiv, returns.div]]),
                             floatfmt="{:.2%}"))
+        fprint(render_table(Table(["Book Value", "Market Value"],
+                                  [[returns.book_value, returns.market_value]]),
+                            floatfmt="{:0.2f}"))
+        fprint(render_table(Table(["PnL"],
+                                  [[returns.pnl]]),
+                            floatfmt="{:.2%}"))
 
         # Compute table of returns over intervals.
         table = compute_returns_table(pricer, target_currency, account_data,
